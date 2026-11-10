@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>Wall Ball – Coach</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#141b24; --line:#243245; --text:#e9eff6; --muted:#8fa1b5;
+    --top:#22c55e; --mid:#f59e0b; --bot:#38bdf8; --bad:#f43f5e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{min-height:100dvh;max-width:560px;margin:0 auto;
+    padding:calc(10px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom))}
+  header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  h1{font-size:17px;margin:0;flex:1;letter-spacing:.2px}
+  .pill{font-size:12px;padding:5px 9px;border-radius:99px;background:var(--panel);
+    border:1px solid var(--line);color:var(--muted);max-width:52vw;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .pill.ok{color:var(--top);border-color:#1f6b3b}
+  .pill.warn{color:var(--mid);border-color:#7a5410}
+  .pill.bad{color:var(--bad);border-color:#7a2236}
+  button{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:11px 14px;cursor:pointer}
+  button:active{transform:scale(.98)}
+  button.primary{background:#1d4ed8;border-color:#2c5fe8;font-weight:600}
+  .tiles{display:flex;flex-direction:column;gap:8px}
+  .tile{--c:var(--muted);position:relative;display:flex;align-items:center;justify-content:space-between;
+    min-height:19vh;max-height:170px;padding:10px 18px;background:var(--panel);
+    border:2px solid var(--line);border-left:10px solid var(--c);border-radius:16px}
+  .tile .name{font-size:22px;font-weight:700;letter-spacing:.5px}
+  .tile .sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .tile .count{font-size:64px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .tile.top{--c:var(--top)} .tile.mid{--c:var(--mid)} .tile.bot{--c:var(--bot)}
+  .tile.flash{animation:flash .95s ease-out}
+  @keyframes flash{
+    0%{background:var(--c);color:#04110a;border-color:var(--c)}
+    55%{background:var(--c);color:#04110a;border-color:var(--c)}
+    100%{background:var(--panel);color:var(--text)}
+  }
+  .tile.flash .sub{color:inherit}
+  .summary{display:flex;justify-content:space-between;align-items:baseline;margin:12px 2px 8px;
+    font-size:15px;color:var(--muted)}
+  .summary b{color:var(--text);font-size:20px}
+  .row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px;margin-bottom:8px}
+  .row.two{grid-template-columns:1fr 1fr}
+  .wrong{background:#2a1119;border-color:#7a2236;color:#ffd5de;font-weight:700;font-size:17px;padding:15px}
+  .wrong.on{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .small{font-size:13px;padding:10px 8px}
+  .small.confirm{background:var(--bad);border-color:var(--bad);color:#fff}
+  .list{margin-top:10px;border-top:1px solid var(--line)}
+  .item{display:grid;grid-template-columns:48px 78px 1fr auto;gap:8px;align-items:center;
+    padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .item .n{color:var(--muted);font-variant-numeric:tabular-nums}
+  .chip{font-weight:700;font-size:12px;padding:3px 8px;border-radius:99px;text-align:center;color:#04110a}
+  .chip.top{background:var(--top)} .chip.mid{background:var(--mid)} .chip.bot{background:var(--bot)}
+  .chip.unk{background:var(--muted)}
+  .item .meta{color:var(--muted);font-size:13px}
+  .item button{font-size:12px;padding:6px 10px;border-radius:9px}
+  .item.bad{background:#1f0f15}
+  .item.bad button{background:var(--bad);border-color:var(--bad);color:#fff}
+  .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:#223148;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.show{opacity:1}
+  textarea{width:100%;height:140px;margin-top:8px;background:var(--panel);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;display:none}
+  .hint{color:var(--muted);font-size:12.5px;line-height:1.45;margin:10px 2px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Wall Ball – Coach</h1>
+  <span id="status" class="pill">Όχι συνδεδεμένο</span>
+  <button id="btnConnect" class="primary">Σύνδεση</button>
+</header>
+
+<div class="tiles">
+  <div class="tile top" id="tileTop"><div><div class="name">ΠΑΝΩ</div><div class="sub">άντρες</div></div><div class="count" id="cTop">0</div></div>
+  <div class="tile mid" id="tileMid"><div><div class="name">ΜΕΣΗ</div><div class="sub">δεν μετράει</div></div><div class="count" id="cMid">0</div></div>
+  <div class="tile bot" id="tileBot"><div><div class="name">ΚΑΤΩ</div><div class="sub">γυναίκες</div></div><div class="count" id="cBot">0</div></div>
+</div>
+
+<div class="summary">
+  <span>Σύνολο <b id="cAll">0</b></span>
+  <span id="lastInfo">–</span>
+  <span>ΛΑΘΟΣ <b id="cBad">0</b></span>
+</div>
+
+<div class="row two">
+  <button id="btnWrong" class="wrong">ΛΑΘΟΣ (το φανάρι δεν συμφωνεί)</button>
+  <button id="btnCopy">Αντιγραφή αναφοράς</button>
+</div>
+<div class="row two">
+  <button id="btnReset" class="small">Μηδενισμός</button>
+  <button id="btnDemo" class="small">Δοκιμή χωρίς συσκευή</button>
+</div>
+<textarea id="report" readonly></textarea>
+
+<div class="list" id="list"></div>
+<p class="hint">Το «ΛΑΘΟΣ» σημειώνει το τελευταίο χτύπημα που το φανάρι έβγαλε διαφορετικά από αυτό που είδες. Μπορείς επίσης να πατήσεις «ΛΑΘΟΣ» σε οποιαδήποτε γραμμή της λίστας. Οι αριθμοί (#) ταυτίζονται με το HIT# του serial monitor.</p>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const CHAR    = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+const ZONES = {
+  T: {key:"top", label:"ΠΑΝΩ"},
+  M: {key:"mid", label:"ΜΕΣΗ"},
+  B: {key:"bot", label:"ΚΑΤΩ"},
+  "?": {key:"unk", label:"ΑΓΝΩΣΤΟ"}
+};
+
+const $ = id => document.getElementById(id);
+const state = { hits: [], counts: {T:0, M:0, B:0, "?":0} };
+let device = null, rxBuf = "", retry = 0, demoTimer = null, resetTimer = null, wakeLock = null;
+
+function setStatus(text, kind){
+  const el = $("status");
+  el.textContent = text;
+  el.className = "pill" + (kind ? " " + kind : "");
+}
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+async function keepAwake(){
+  try{
+    if ("wakeLock" in navigator && !wakeLock){
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  }catch(e){ /* δεν πειράζει */ }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
+
+/* ---------- δεδομένα ---------- */
+function addHit(h){
+  state.hits.push(h);
+  state.counts[h.z] = (state.counts[h.z] || 0) + 1;
+  render();
+  const z = ZONES[h.z] || ZONES["?"];
+  const tile = {top:"tileTop", mid:"tileMid", bot:"tileBot"}[z.key];
+  if (tile){
+    const el = $(tile);
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }
+  if (navigator.vibrate){
+    navigator.vibrate(z.key === "top" ? [70] : z.key === "bot" ? [40,60,40] : [25]);
+  }
+}
+
+function handleLine(line){
+  // H,<n>,<Z>,<rZ>,<t>
+  const p = line.trim().split(",");
+  if (p.length < 5 || p[0] !== "H") return;
+  const n = parseInt(p[1], 10);
+  const z = ZONES[p[2]] ? p[2] : "?";
+  const rz = parseFloat(p[3]);
+  const t = parseInt(p[4], 10);
+  if (isNaN(n)) return;
+  addHit({n, z, rz: isNaN(rz) ? null : rz, t: isNaN(t) ? null : t, bad: false, at: Date.now()});
+}
+
+function onText(txt){
+  rxBuf += txt;
+  let i;
+  while ((i = rxBuf.indexOf("\n")) >= 0){
+    const line = rxBuf.slice(0, i);
+    rxBuf = rxBuf.slice(i + 1);
+    if (line.trim()) handleLine(line);
+  }
+  if (rxBuf.length > 200) rxBuf = "";
+}
+
+/* ---------- εμφάνιση ---------- */
+function render(){
+  $("cTop").textContent = state.counts.T;
+  $("cMid").textContent = state.counts.M;
+  $("cBot").textContent = state.counts.B;
+  $("cAll").textContent = state.hits.length;
+  const bad = state.hits.filter(h => h.bad).length;
+  $("cBad").textContent = bad;
+  const last = state.hits[state.hits.length - 1];
+  $("lastInfo").textContent = last
+    ? "#" + last.n + " " + (ZONES[last.z] || ZONES["?"]).label + (last.rz != null ? " · rZ " + last.rz.toFixed(1) : "")
+    : "–";
+  $("btnWrong").classList.toggle("on", !!(last && last.bad));
+
+  const list = $("list");
+  list.textContent = "";
+  const shown = state.hits.slice(-40).reverse();
+  for (const h of shown){
+    const z = ZONES[h.z] || ZONES["?"];
+    const row = document.createElement("div");
+    row.className = "item" + (h.bad ? " bad" : "");
+    const n = document.createElement("span"); n.className = "n"; n.textContent = "#" + h.n;
+    const chip = document.createElement("span"); chip.className = "chip " + z.key; chip.textContent = z.label;
+    const meta = document.createElement("span"); meta.className = "meta";
+    meta.textContent = (h.rz != null ? "rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " · t=" + h.t + "s" : "");
+    const btn = document.createElement("button");
+    btn.textContent = h.bad ? "ΛΑΘΟΣ ✓" : "λάθος;";
+    btn.addEventListener("click", () => { h.bad = !h.bad; render(); });
+    row.append(n, chip, meta, btn);
+    list.appendChild(row);
+  }
+}
+
+function reportText(){
+  const d = new Date();
+  const bad = state.hits.filter(h => h.bad).length;
+  const lines = [];
+  lines.push("Wall Ball – αναφορά " + d.toLocaleDateString("el-GR") + " " + d.toLocaleTimeString("el-GR", {hour:"2-digit", minute:"2-digit"}));
+  lines.push("Σύνολο: " + state.hits.length + " (ΠΑΝΩ " + state.counts.T + ", ΚΑΤΩ " + state.counts.B + ", ΜΕΣΗ " + state.counts.M +
+             (state.counts["?"] ? ", ΑΓΝΩΣΤΟ " + state.counts["?"] : "") + ")");
+  lines.push("ΛΑΘΟΣ σημειωμένα: " + bad);
+  lines.push("");
+  for (const h of state.hits){
+    const z = (ZONES[h.z] || ZONES["?"]).label;
+    lines.push("#" + h.n + " " + z + (h.rz != null ? " rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " t=" + h.t + "s" : "") + (h.bad ? " ΛΑΘΟΣ" : ""));
+  }
+  return lines.join("\n");
+}
+
+/* ---------- κουμπιά ---------- */
+$("btnWrong").addEventListener("click", () => {
+  const last = state.hits[state.hits.length - 1];
+  if (!last){ toast("Δεν υπάρχει χτύπημα"); return; }
+  last.bad = !last.bad;
+  render();
+  toast(last.bad ? "Σημειώθηκε ΛΑΘΟΣ στο #" + last.n : "Αφαιρέθηκε το ΛΑΘΟΣ");
+});
+
+$("btnCopy").addEventListener("click", async () => {
+  const txt = reportText();
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast("Η αναφορά αντιγράφηκε");
+  }catch(e){
+    const ta = $("report");
+    ta.style.display = "block";
+    ta.value = txt;
+    ta.focus(); ta.select();
+    toast("Κράτα πατημένο και αντίγραψε");
+  }
+});
+
+$("btnReset").addEventListener("click", () => {
+  const b = $("btnReset");
+  if (!b.classList.contains("confirm")){
+    b.classList.add("confirm");
+    b.textContent = "Πάτα ξανά για μηδενισμό";
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { b.classList.remove("confirm"); b.textContent = "Μηδενισμός"; }, 3000);
+    return;
+  }
+  clearTimeout(resetTimer);
+  b.classList.remove("confirm"); b.textContent = "Μηδενισμός";
+  state.hits = []; state.counts = {T:0, M:0, B:0, "?":0};
+  $("report").style.display = "none";
+  render();
+  toast("Μηδενίστηκε");
+});
+
+$("btnDemo").addEventListener("click", () => {
+  keepAwake();
+  const b = $("btnDemo");
+  if (demoTimer){
+    clearInterval(demoTimer); demoTimer = null;
+    b.textContent = "Δοκιμή χωρίς συσκευή";
+    setStatus("Όχι συνδεδεμένο");
+    return;
+  }
+  b.textContent = "Σταμάτα τη δοκιμή";
+  setStatus("ΔΟΚΙΜΗ (ψεύτικα χτυπήματα)", "warn");
+  let n = state.hits.length;
+  const t0 = Date.now();
+  demoTimer = setInterval(() => {
+    n++;
+    const r = Math.random();
+    const z = r < 0.45 ? "T" : r < 0.85 ? "B" : "M";
+    const rz = z === "T" ? 9 + Math.random() * 12 : z === "B" ? 1 + Math.random() * 3.5 : 5 + Math.random() * 2;
+    addHit({n, z, rz, t: Math.round((Date.now() - t0) / 1000), bad: false, at: Date.now()});
+  }, 1800);
+});
+
+/* ---------- Bluetooth ---------- */
+function onData(ev){
+  const dv = ev.target.value;
+  onText(new TextDecoder().decode(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)));
+}
+
+async function openGatt(){
+  setStatus("Σύνδεση…", "warn");
+  const server = await device.gatt.connect();
+  const svc = await server.getPrimaryService(SERVICE);
+  const ch = await svc.getCharacteristic(CHAR);
+  await ch.startNotifications();
+  ch.addEventListener("characteristicvaluechanged", onData);
+  retry = 0;
+  rxBuf = "";
+  setStatus("Συνδεδεμένο: " + (device.name || "WallBall"), "ok");
+  $("btnConnect").textContent = "Επανασύνδεση";
+}
+
+async function autoReconnect(){
+  while (device && !device.gatt.connected && retry < 15){
+    retry++;
+    setStatus("Αποσυνδέθηκε – προσπάθεια " + retry + "/15", "warn");
+    await new Promise(r => setTimeout(r, 2000));
+    try{ await openGatt(); return; }catch(e){ /* ξαναδοκιμάζουμε */ }
+  }
+  if (device && !device.gatt.connected) setStatus("Αποσυνδέθηκε – πάτα Σύνδεση", "bad");
+}
+
+async function connect(){
+  keepAwake();
+  if (!navigator.bluetooth){
+    setStatus("Χρειάζεται Chrome σε Android", "bad");
+    toast("Άνοιξε τη σελίδα στο Chrome του Android");
+    return;
+  }
+  try{
+    if (device && device.gatt.connected){ device.gatt.disconnect(); }
+    setStatus("Αναζήτηση…", "warn");
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{namePrefix: "WallBall"}],
+      optionalServices: [SERVICE]
+    });
+    device.addEventListener("gattserverdisconnected", autoReconnect);
+    await openGatt();
+  }catch(e){
+    if (e && e.name === "NotFoundError") setStatus("Δεν επιλέχθηκε συσκευή", "bad");
+    else setStatus("Σφάλμα: " + (e && e.message ? e.message : e), "bad");
+  }
+}
+$("btnConnect").addEventListener("click", connect);
+
+// για έλεγχο από τον προγραμματιστή
+window.__feed = onText;
+
+render();
+</script>
+</body>
+</html>
