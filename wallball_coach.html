@@ -186,7 +186,19 @@ function onText(txt){
 }
 
 /* ---------- εμφάνιση ---------- */
+const KEY = "wallball_coach_v1";
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+}
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (d && Array.isArray(d.hits) && d.counts){ state.hits = d.hits; state.counts = d.counts; }
+  }catch(e){}
+}
+
 function render(){
+  save();
   $("cTop").textContent = state.counts.T;
   $("cMid").textContent = state.counts.M;
   $("cBot").textContent = state.counts.B;
@@ -351,6 +363,7 @@ $("btnConnect").addEventListener("click", connect);
 // για έλεγχο από τον προγραμματιστή
 window.__feed = onText;
 
+load();
 render();
 </script>
 </body>
