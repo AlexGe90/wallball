@@ -68,6 +68,17 @@
   .toast.show{opacity:1}
   textarea{width:100%;height:140px;margin-top:8px;background:var(--panel);color:var(--text);
     border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;display:none}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;z-index:10}
+  .sheet.show{display:flex}
+  .sheet .box{width:100%;max-width:560px;margin:0 auto;background:var(--panel);border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+  .sheet h2{font-size:16px;margin:0 0 12px;font-weight:600}
+  .sheet .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .sheet .opts button{font-weight:700;font-size:18px;padding:18px 8px;color:#04110a;border:0}
+  .sheet .opts .top{background:var(--top)} .sheet .opts .mid{background:var(--mid)}
+  .sheet .opts .bot{background:var(--bot)} .sheet .opts .dbl{background:#c4b5fd}
+  .sheet .extra{display:flex;gap:8px;margin-top:10px}
+  .sheet .extra button{flex:1}
   .hint{color:var(--muted);font-size:12.5px;line-height:1.45;margin:10px 2px 0}
 </style>
 </head>
@@ -101,7 +112,17 @@
 <textarea id="report" readonly></textarea>
 
 <div class="list" id="list"></div>
-<p class="hint">Το «ΛΑΘΟΣ» σημειώνει το τελευταίο χτύπημα που το φανάρι έβγαλε διαφορετικά από αυτό που είδες. Μπορείς επίσης να πατήσεις «ΛΑΘΟΣ» σε οποιαδήποτε γραμμή της λίστας. Οι αριθμοί (#) ταυτίζονται με το HIT# του serial monitor.</p>
+<p class="hint">Το «ΛΑΘΟΣ» ανοίγει επιλογή: τι ήταν πραγματικά το τελευταίο χτύπημα (ΠΑΝΩ, ΚΑΤΩ, ΜΕΣΗ ή ΔΙΠΛΟ αν μετρήθηκε δύο φορές). Μπορείς να το κάνεις και σε οποιαδήποτε γραμμή της λίστας με το «λάθος;». Οι αριθμοί (#) ταυτίζονται με το HIT# του serial monitor.</p>
+<div class="sheet" id="sheet"><div class="box">
+  <h2 id="sheetTitle">Τι ήταν πραγματικά;</h2>
+  <div class="opts">
+    <button class="top" data-t="T">ΠΑΝΩ</button>
+    <button class="bot" data-t="B">ΚΑΤΩ</button>
+    <button class="mid" data-t="M">ΜΕΣΗ</button>
+    <button class="dbl" data-t="D">ΔΙΠΛΟ</button>
+  </div>
+  <div class="extra"><button id="sheetUnmark">Αφαίρεση ΛΑΘΟΣ</button><button id="sheetCancel">Ακύρωση</button></div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -116,6 +137,7 @@ const ZONES = {
   "?": {key:"unk", label:"ΑΓΝΩΣΤΟ"}
 };
 
+const TRUTH = {T:"ΠΑΝΩ", B:"ΚΑΤΩ", M:"ΜΕΣΗ", D:"ΔΙΠΛΟ"};
 const $ = id => document.getElementById(id);
 const state = { hits: [], counts: {T:0, M:0, B:0, "?":0} };
 let device = null, rxBuf = "", retry = 0, demoTimer = null, resetTimer = null, wakeLock = null;
@@ -221,10 +243,10 @@ function render(){
     const n = document.createElement("span"); n.className = "n"; n.textContent = "#" + h.n;
     const chip = document.createElement("span"); chip.className = "chip " + z.key; chip.textContent = z.label;
     const meta = document.createElement("span"); meta.className = "meta";
-    meta.textContent = (h.rz != null ? "rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " · t=" + h.t + "s" : "");
+    meta.textContent = (h.rz != null ? "rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " · t=" + h.t + "s" : "") + (h.bad && h.truth ? " · ήταν " + TRUTH[h.truth] : "");
     const btn = document.createElement("button");
     btn.textContent = h.bad ? "ΛΑΘΟΣ ✓" : "λάθος;";
-    btn.addEventListener("click", () => { h.bad = !h.bad; render(); });
+    btn.addEventListener("click", () => openSheet(h));
     row.append(n, chip, meta, btn);
     list.appendChild(row);
   }
@@ -241,7 +263,7 @@ function reportText(){
   lines.push("");
   for (const h of state.hits){
     const z = (ZONES[h.z] || ZONES["?"]).label;
-    lines.push("#" + h.n + " " + z + (h.rz != null ? " rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " t=" + h.t + "s" : "") + (h.bad ? " ΛΑΘΟΣ" : ""));
+    lines.push("#" + h.n + " " + z + (h.rz != null ? " rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " t=" + h.t + "s" : "") + (h.bad ? " ΛΑΘΟΣ" + (h.truth ? " (ήταν " + TRUTH[h.truth] + ")" : "") : ""));
   }
   return lines.join("\n");
 }
@@ -250,10 +272,31 @@ function reportText(){
 $("btnWrong").addEventListener("click", () => {
   const last = state.hits[state.hits.length - 1];
   if (!last){ toast("Δεν υπάρχει χτύπημα"); return; }
-  last.bad = !last.bad;
-  render();
-  toast(last.bad ? "Σημειώθηκε ΛΑΘΟΣ στο #" + last.n : "Αφαιρέθηκε το ΛΑΘΟΣ");
+  openSheet(last);
 });
+
+let sheetHit = null;
+function openSheet(h){
+  sheetHit = h;
+  const z = (ZONES[h.z] || ZONES["?"]).label;
+  $("sheetTitle").textContent = "#" + h.n + " (το φανάρι έδειξε " + z + ") – τι ήταν πραγματικά;";
+  $("sheetUnmark").style.display = h.bad ? "block" : "none";
+  $("sheet").classList.add("show");
+}
+function closeSheet(){ $("sheet").classList.remove("show"); sheetHit = null; }
+document.querySelectorAll("#sheet .opts button").forEach(b => b.addEventListener("click", () => {
+  if (!sheetHit) return;
+  sheetHit.bad = true; sheetHit.truth = b.dataset.t;
+  const n = sheetHit.n;
+  closeSheet(); render();
+  toast("#" + n + ": ήταν " + TRUTH[b.dataset.t]);
+}));
+$("sheetUnmark").addEventListener("click", () => {
+  if (sheetHit){ sheetHit.bad = false; delete sheetHit.truth; }
+  closeSheet(); render(); toast("Αφαιρέθηκε το ΛΑΘΟΣ");
+});
+$("sheetCancel").addEventListener("click", closeSheet);
+$("sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
 
 $("btnCopy").addEventListener("click", async () => {
   const txt = reportText();
