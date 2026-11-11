@@ -185,15 +185,18 @@ function addHit(h){
 }
 
 function handleLine(line){
-  // H,<n>,<Z>,<rZ>,<t>
+  // νέο: H,<n>,<Z>,<rZ>,<p%>,<t>     παλιό: H,<n>,<Z>,<rZ>,<t>
   const p = line.trim().split(",");
   if (p.length < 5 || p[0] !== "H") return;
   const n = parseInt(p[1], 10);
   const z = ZONES[p[2]] ? p[2] : "?";
   const rz = parseFloat(p[3]);
-  const t = parseInt(p[4], 10);
+  let pr = null, t;
+  if (p.length >= 6){ pr = parseInt(p[4], 10); t = parseInt(p[5], 10); }
+  else { t = parseInt(p[4], 10); }
   if (isNaN(n)) return;
-  addHit({n, z, rz: isNaN(rz) ? null : rz, t: isNaN(t) ? null : t, bad: false, at: Date.now()});
+  addHit({n, z, rz: isNaN(rz) ? null : rz, p: (pr == null || isNaN(pr)) ? null : pr / 100,
+          t: isNaN(t) ? null : t, bad: false, at: Date.now()});
 }
 
 function onText(txt){
@@ -243,7 +246,7 @@ function render(){
     const n = document.createElement("span"); n.className = "n"; n.textContent = "#" + h.n;
     const chip = document.createElement("span"); chip.className = "chip " + z.key; chip.textContent = z.label;
     const meta = document.createElement("span"); meta.className = "meta";
-    meta.textContent = (h.rz != null ? "rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " · t=" + h.t + "s" : "") + (h.bad && h.truth ? " · ήταν " + TRUTH[h.truth] : "");
+    meta.textContent = (h.rz != null ? "rZ " + h.rz.toFixed(1) : "") + (h.p != null ? " p" + h.p.toFixed(2) : "") + (h.t != null ? " · t=" + h.t + "s" : "") + (h.bad && h.truth ? " · ήταν " + TRUTH[h.truth] : "");
     const btn = document.createElement("button");
     btn.textContent = h.bad ? "ΛΑΘΟΣ ✓" : "λάθος;";
     btn.addEventListener("click", () => openSheet(h));
@@ -263,7 +266,7 @@ function reportText(){
   lines.push("");
   for (const h of state.hits){
     const z = (ZONES[h.z] || ZONES["?"]).label;
-    lines.push("#" + h.n + " " + z + (h.rz != null ? " rZ " + h.rz.toFixed(1) : "") + (h.t != null ? " t=" + h.t + "s" : "") + (h.bad ? " ΛΑΘΟΣ" + (h.truth ? " (ήταν " + TRUTH[h.truth] + ")" : "") : ""));
+    lines.push("#" + h.n + " " + z + (h.rz != null ? " rZ " + h.rz.toFixed(1) : "") + (h.p != null ? " p " + h.p.toFixed(2) : "") + (h.t != null ? " t=" + h.t + "s" : "") + (h.bad ? " ΛΑΘΟΣ" + (h.truth ? " (ήταν " + TRUTH[h.truth] + ")" : "") : ""));
   }
   return lines.join("\n");
 }
